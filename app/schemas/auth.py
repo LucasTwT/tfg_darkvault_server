@@ -42,6 +42,7 @@ class SaltResponse(BaseModel):
     salt: str
 
 """
+Revisión feature/featureHotfixCrypto:
 3º Ruta de registro del usuario:
     Recibe: username, email y auth_key
     Devuelve: token y refresh_token
@@ -53,11 +54,19 @@ class SaltResponse(BaseModel):
 """
 
 class RegisterRequest(BaseModel):
+    # User data
+    
     username: str = Field(..., min_length=3, max_length=32)
     email: EmailStr
-    auth_key: str = Field(..., min_length=32)  # hash de 32 chars o más
+    
+    # Auth
+    public_key: str = Field(..., min_length=32) 
     auth_salt: str = Field(..., min_length=16)
+    kdf_params: dict
+    
+    # Settings
     default_settings: UserConfig
+    
     @field_validator("username")
     def validate_username(cls, v):
         if " " in v:
@@ -72,6 +81,7 @@ class RegisterResponse(BaseModel):
 
 
 """
+Revisión feature/featureHotfixCrypto:
 4º Ruta de logeo del usuario:
     Recibe: username o email (1 sola entrada) y auth_key
     Devuelve: el token o error
@@ -82,9 +92,8 @@ class RegisterResponse(BaseModel):
     Registrar auditoría (login success o fail)
 """
 
-class LoginRequest(BaseModel):
+class LoginStartRequest(BaseModel):    
     identifier: str  # username O email
-    auth_key: str = Field(..., min_length=32)
 
     @field_validator("identifier")
     def validate_identifier(cls, v):
@@ -92,6 +101,27 @@ class LoginRequest(BaseModel):
         if len(v) == 0:
             raise ValueError("El campo 'identifier' no puede estar vacío.")
         return v
+
+class LoginStartResponse(BaseModel):
+    salt: str
+    kdf_params: dict
+    challenge: str
+
+class LoginFinishRequest(BaseModel):
+    identifier: str
+    signature: str
+    
+
+# class LoginRequest(BaseModel):
+#     identifier: str  # username O email
+#     auth_key: str = Field(..., min_length=32)
+
+#     @field_validator("identifier")
+#     def validate_identifier(cls, v):
+#         v = v.strip()
+#         if len(v) == 0:
+#             raise ValueError("El campo 'identifier' no puede estar vacío.")
+#         return v
 
 
 class LoginResponse(BaseModel):
@@ -134,3 +164,19 @@ class LogoutRequest(BaseModel):
 
 class LogoutResponse(BaseModel):
     status: bool
+    
+"""
+
+"""
+
+class ChallengeStartResponse(BaseModel):
+    salt: str
+    kdf_params: dict
+    challenge: str
+
+class ChallengeFinishRequest(BaseModel):
+    signature: str
+    
+class ChallengeFinishResponse(BaseModel):
+    status: bool
+    

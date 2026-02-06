@@ -4,6 +4,9 @@ from app.schemas.vaults import *
 from app.utils.get_user_context import get_user_context
 
 from app.repositories.vaults import *
+from app.repositories.auth import create_challenge, get_user_data, consume_challenge, verify_challenge_signature
+
+from app.core.ip_management import *
 
 router = APIRouter(prefix="/vault", tags=["Vaults"])
 
@@ -23,7 +26,24 @@ def modify_vault(vault_id: str, payload: ModifyVaultRequest, ctx = Depends(get_u
     modify_vault_by_id(ctx["db"], user_id=ctx["user_id"], vault_id=vault_id, new_data=payload.new_data, ip=ctx["ip"], city=ctx["city"], country=ctx["country"], user_agent=ctx["agent"])
     return ModifyVaultResponse(status=True)
 
-@router.delete('/{vault_id}', response_model=DeleteVaultResponse, status_code=status.HTTP_202_ACCEPTED)
-def delete_vault(vault_id: str, ctx = Depends(get_user_context)):
-    delete_vault_by_id(ctx["db"], user_id=ctx["user_id"], vault_id=vault_id, ip=ctx["ip"], city=ctx["city"], country=ctx["country"], user_agent=ctx["agent"])
-    return DeleteVaultResponse(status=True)
+# Revisión feature/featureHotfixCrypto:
+@router.delete('/start', response_model=DeleteVaultStartResponse, status_code=status.HTTP_202_ACCEPTED)
+def delete_vault(ctx = Depends(get_user_context)):
+    user = get_user_data(ctx["db"], ctx["user_id"])
+    challenge = create_challenge(ctx["db"], user=user)
+    return DeleteVaultStartResponse (
+        salt=user.kdf_salt,
+        kdf_params=user.kdf_params,
+        challenge=challenge.challenge
+    )
+
+@router.delete('/{vault_id}/finish', response_model=DeleteVaultFinishResponse, status_code=status.HTTP_202_ACCEPTED)
+def delete_vault(vault_id: str, payload: DeleteVaultFinishRequest, ctx = Depends(get_user_context)):
+    user = get_user_data(ctx["db"], ctx["user_id"])
+    challenge = consume_challenge(db=ctx["db"], user_id=user.id)
+    
+    if not verify_challenge_signature(user.auth_verifier, challenge.challenge, payload.signature):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    
+    delete_vault_by_id(ctx["db"], user.id, vault_id=vault_id, ip=ctx["ip"], city=ctx["city"], country=ctx["country"], user_agent=ctx["agent"])
+    return DeleteVaultFinishResponse(status=True)

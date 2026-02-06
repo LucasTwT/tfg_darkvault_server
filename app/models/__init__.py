@@ -7,3 +7,4 @@ from .ip_blocklist import IPBlockList
 from .logins import Logins
 from .vault_files import VaultFiles
 from .file_chunks import FileChunks
+from .challenges import LoginChallenges

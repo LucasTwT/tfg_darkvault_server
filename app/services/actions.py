@@ -10,6 +10,9 @@ class Actions(str, Enum):
     new_vault = "New vault created"
     modify_vault = "MODIFY vault"
     delete_vault = "DELETE vault"
+    new_login = "New login created"
+    modify_login = "MODIFY login"
+    delete_login = "Delete login"
     
 class Results(str, Enum):
     fail = "Fail"

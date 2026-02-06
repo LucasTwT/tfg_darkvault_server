@@ -29,7 +29,6 @@ def modify_vault_by_id(db: Session, user_id: str, vault_id: str, new_data: Vault
     vault.name = new_data.name
     vault.settings = new_data.settings.model_dump()
     vault.updated_at = datetime.now(UTC)
-    
     db.commit()
     db.refresh(vault)
     

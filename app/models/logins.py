@@ -22,7 +22,7 @@ class Logins(Base):
     __tablename__ = "logins"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     vault_id = Column(UUID(as_uuid=True), ForeignKey("vaults.id", ondelete="CASCADE"), nullable=False)
 
     ciphertext = Column(BYTEA, nullable=False)
@@ -35,3 +35,4 @@ class Logins(Base):
     updated_at =  Column(DateTime(timezone=True), server_default=func.now())
     
     vault = relationship("Vaults", back_populates="logins")
+    user = relationship("Users")

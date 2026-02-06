@@ -1,8 +1,8 @@
-"""init
+"""intial
 
-Revision ID: 068ec14e48d2
+Revision ID: e826384b8b40
 Revises: 
-Create Date: 2025-11-22 16:15:08.731611
+Create Date: 2025-12-16 09:46:40.165197
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '068ec14e48d2'
+revision: str = 'e826384b8b40'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,8 +25,9 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('username', sa.String(), nullable=False),
-    sa.Column('auth_hash', sa.String(), nullable=False),
-    sa.Column('auth_salt', sa.String(), nullable=False),
+    sa.Column('auth_verifier', sa.String(), nullable=False),
+    sa.Column('kdf_salt', sa.String(), nullable=False),
+    sa.Column('kdf_params', sa.JSON(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -45,6 +46,15 @@ def upgrade() -> None:
     sa.Column('result', sa.String(), nullable=False),
     sa.Column('timestamp', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('challenges',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('challenge', sa.String(), nullable=False),
+    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('ip_blocklist',
@@ -139,6 +149,7 @@ def downgrade() -> None:
     op.drop_table('user_settings')
     op.drop_table('sessions')
     op.drop_table('ip_blocklist')
+    op.drop_table('challenges')
     op.drop_table('audit_logs')
     op.drop_index(op.f('ix_users_username'), table_name='users')
     op.drop_index(op.f('ix_users_id'), table_name='users')

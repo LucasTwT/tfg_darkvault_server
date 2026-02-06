@@ -42,7 +42,14 @@ class ModifyVaultRequest(BaseModel):
 class ModifyVaultResponse(BaseModel):
     status: bool
     
+class DeleteVaultStartResponse(BaseModel):
+    salt: str
+    kdf_params: dict
+    challenge: str
 
-class DeleteVaultResponse(BaseModel):
+class DeleteVaultFinishRequest(BaseModel):
+    signature: str
+    
+class DeleteVaultFinishResponse(BaseModel):
     status: bool
     
