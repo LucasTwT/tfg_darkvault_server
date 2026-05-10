@@ -154,14 +154,16 @@ def verify_login_data(db: Session, identifier: str, auth_key: str, ip: str, coun
     return user
 
 
-def verify_refresh_token(db: Session, refresh_token: str, id: str):
+def verify_refresh_token(db: Session, refresh_token: str, id):
     sessions = db.query(Sessions).filter(
         and_(or_(Sessions.expired == False,
         Sessions.expires_at > datetime.now(UTC)), Sessions.user_id == id)
     ).all()
     for session in sessions:
         try:
-            if bcrypt.checkpw(refresh_token.encode(), session.refresh_token_hash):
+            # Must truncate to 72 bytes same as hash_refresh_token
+            token_bytes = refresh_token.encode('utf-8')[:72]
+            if bcrypt.checkpw(token_bytes, session.refresh_token_hash):
                 return session
         except Exception:
             continue 
@@ -185,6 +187,13 @@ def update_last_used(db: Session, session: Sessions):
     db.add(session)
     db.commit()
     db.refresh(session)
+    return session
+
+def invalidate_session(db: Session, session: Sessions):
+    """Invalidate a session during refresh token rotation."""
+    session.expired = True
+    db.add(session)
+    db.commit()
     return session
 
 def logout_session(db: Session, session: Sessions, ip: str, country: str, city: str, user_agent: str):

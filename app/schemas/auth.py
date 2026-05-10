@@ -76,7 +76,6 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
 
 
@@ -126,7 +125,6 @@ class LoginFinishRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
 
 

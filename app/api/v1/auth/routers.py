@@ -1,10 +1,11 @@
-from fastapi import APIRouter, status, Depends, Request
+from fastapi import APIRouter, status, Depends, Request, Response
 
 from app.schemas.auth import *
 from app.core.tokens import create_token, decode_token, hash_refresh_token
 from app.core.security_passwords import auth_key_context
 from app.core.constants import ENCODE_REFRESH_TOKEN
 from app.core.ip_management import get_client_ip, get_user_agent, get_location_by_ip
+from app.core.cookie import set_refresh_token_cookie, clear_refresh_token_cookie, REFRESH_TOKEN_COOKIE_NAME
 from app.db.conect_db import get_db
 from app.utils.get_user_context import get_user_context
 
@@ -28,9 +29,8 @@ def get_salt(payload: SaltRequest, request: Request, db: Session = Depends(get_d
     salt = get_auth_salt(db, payload.identifier, ip, user_agent, country, city)
     return SaltResponse(salt=salt)
 
-# Revisión feature/featureHotfixCrypto:
 @router.post("/register/user", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-def register_user(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
+def register_user(payload: RegisterRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     user = verify_user(db, payload.email, payload.username)
 
     if not user:
@@ -41,7 +41,11 @@ def register_user(payload: RegisterRequest, request: Request, db: Session = Depe
         access_token = create_token({"id": str(created_user.id), "username": payload.username, "email": payload.email})
         refresh_token = create_token({"session": True, "user_id": str(created_user.id)}, expires_delta=timedelta(days=30))
         session = add_record_in_sessions(db, created_user.id, ip, hash_refresh_token(refresh_token), country, city, user_agent)
-        return RegisterResponse(access_token=access_token, refresh_token=refresh_token)
+        
+        # Set refresh token as HttpOnly cookie
+        set_refresh_token_cookie(response, refresh_token)
+        
+        return RegisterResponse(access_token=access_token)
 
 @router.post("/login/start", response_model=LoginStartResponse, status_code=status.HTTP_200_OK)
 def login_user(payload: LoginStartRequest, db: Session = Depends(get_db)):
@@ -54,7 +58,7 @@ def login_user(payload: LoginStartRequest, db: Session = Depends(get_db)):
     )
 
 @router.post("/login/finish", response_model=LoginResponse, status_code=status.HTTP_200_OK)
-def login_user(payload: LoginFinishRequest, request: Request,db: Session = Depends(get_db)):
+def login_user(payload: LoginFinishRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     user = get_user_by_identifier(db=db, identifier=payload.identifier)
     challenge = consume_challenge(db=db, user_id=user.id)
     if not verify_challenge_signature(user.auth_verifier, challenge.challenge, payload.signature):
@@ -68,31 +72,65 @@ def login_user(payload: LoginFinishRequest, request: Request,db: Session = Depen
     refresh_token = create_token({"session": True, "user_id": str(user.id)}, expires_delta=timedelta(days=30))
     session = add_record_in_sessions(db, user.id, ip, hash_refresh_token(refresh_token), country, city, user_agent)
     
+    # Set refresh token as HttpOnly cookie
+    set_refresh_token_cookie(response, refresh_token)
+    
     return LoginResponse (
-        access_token=access_token, 
-        refresh_token=refresh_token,
+        access_token=access_token,
     )
 
 @router.post("/refresh", response_model=RefreshResponse, status_code=status.HTTP_201_CREATED)
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
-    # decode 
-    data = decode_token(payload.refresh_token, ENCODE_REFRESH_TOKEN)
-    session = verify_refresh_token(db=db, refresh_token=payload.refresh_token, id=data["user_id"])
-    user = get_user_data(db=db, id=session.user_id)
-    access_token = create_token({"id": str(user.id), "username": user.username, "email": user.email})
-    return RefreshResponse(access_token=access_token)
-        
+def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+    # Read refresh token from cookie
+    refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token in cookie")
+    
+    try:
+        # Decode and validate
+        data = decode_token(refresh_token, ENCODE_REFRESH_TOKEN)
+        session = verify_refresh_token(db=db, refresh_token=refresh_token, id=data["user_id"])
+        user = get_user_data(db=db, id=session.user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Refresh failed: {str(e)}")
+    
+    # Rotation: invalidate old session, create new tokens
+    invalidate_session(db, session)
+    
+    new_access_token = create_token({"id": str(user.id), "username": user.username, "email": user.email})
+    new_refresh_token = create_token({"session": True, "user_id": str(user.id)}, expires_delta=timedelta(days=30))
+    
+    ip = get_client_ip(request=request)
+    user_agent = get_user_agent(request=request)
+    country, city = get_location_by_ip(ip)
+    add_record_in_sessions(db, user.id, ip, hash_refresh_token(new_refresh_token), country, city, user_agent)
+    
+    # Set new rotated refresh token cookie
+    set_refresh_token_cookie(response, new_refresh_token)
+    
+    return RefreshResponse(access_token=new_access_token)
     
 @router.post("/logout", response_model=LogoutResponse, status_code=status.HTTP_200_OK)
-def logout(payload: LogoutRequest, request: Request, db: Session = Depends(get_db)):
-        ip = get_client_ip(request=request)
-        user_agent = get_user_agent(request=request)
-        country, city = get_location_by_ip(ip)
-        session = verify_refresh_token(db, refresh_token=payload.refresh_token)
-        logout_session(db, session=session, ip=ip, user_agent=user_agent, country=country, city=city)
-        if session:
-            return LogoutResponse(status=True)
-        return LoginResponse(status=False)
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    
+    if refresh_token:
+        try:
+            data = decode_token(refresh_token, ENCODE_REFRESH_TOKEN)
+            session = verify_refresh_token(db, refresh_token=refresh_token, id=data["user_id"])
+            ip = get_client_ip(request=request)
+            user_agent = get_user_agent(request=request)
+            country, city = get_location_by_ip(ip)
+            logout_session(db, session=session, ip=ip, user_agent=user_agent, country=country, city=city)
+        except Exception:
+            pass  # Cookie might be invalid, still clear it
+    
+    # Always clear the cookie
+    clear_refresh_token_cookie(response)
+    
+    return LogoutResponse(status=True)
     
 @router.post("/challenge/start", response_model=ChallengeStartResponse, status_code=status.HTTP_200_OK)
 def challenge_start(ctx = Depends(get_user_context)):
