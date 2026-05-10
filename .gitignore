@@ -1,2 +1,7 @@
 .env.postgres
 .env.server
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
