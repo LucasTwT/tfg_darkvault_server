@@ -36,7 +36,8 @@ def decode_token(token, keys: list[str]):
 
 
 def hash_refresh_token(token: str) -> bytes:
-    bytes = token.encode('utf-8')
+    # bcrypt tiene límite de 72 bytes, truncar si es necesario
+    token_bytes = token.encode('utf-8')[:72]
     salt = bcrypt.gensalt()
-    hash = bcrypt.hashpw(bytes, salt)
+    hash = bcrypt.hashpw(token_bytes, salt)
     return hash

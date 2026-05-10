@@ -1,7 +1,9 @@
 .env.postgres
 .env.server
 
-# Python cache
+# --- Python ---
 __pycache__/
 *.py[cod]
-*.pyo
+*$py.class
+*.so
+.pytest_cache/
