@@ -15,12 +15,12 @@ def create_login(vault_id: str, payload: CreateLoginRequest, ctx = Depends(get_u
 
 @router.post('/{vault_id}/all', response_model=GetAllLoginResponseByVaultID, status_code=status.HTTP_200_OK)
 def get_all_logins(vault_id: str, ctx = Depends(get_user_context)):
-    vaults = get_all_logins_by_vault_id(db=ctx["db"], user_id=ctx["user_id"], vault_id=vault_id)
-    return GetAllLoginResponseByVaultID(status=True, vaults=vaults)
+    logins = get_all_logins_by_vault_id(db=ctx["db"], user_id=ctx["user_id"], vault_id=vault_id)
+    return GetAllLoginResponseByVaultID(status=True, user_logins=logins)
 
 
 @router.patch('/{vault_id}/{login_id}', response_model=ModifyLoginResponse, status_code=status.HTTP_202_ACCEPTED)
-def modify_login(vault_id: str, login_id: str, payload: ModifyLoginRequest, ctx = Depends(get_user_context)):
+def modify_login_endpoint(vault_id: str, login_id: str, payload: ModifyLoginRequest, ctx = Depends(get_user_context)):
     modify_login(ctx["db"], user_id=ctx["user_id"], payload=payload, ip=ctx["ip"], city=ctx["city"], country=ctx["country"], user_agent=ctx["agent"])
     return ModifyLoginResponse(status=True)
 
