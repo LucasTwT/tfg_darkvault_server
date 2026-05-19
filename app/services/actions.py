@@ -13,7 +13,9 @@ class Actions(str, Enum):
     new_login = "New login created"
     modify_login = "MODIFY login"
     delete_login = "Delete login"
-    
+    upload_file = "Upload file"
+    delete_file = "Delete file"
+
 class Results(str, Enum):
     fail = "Fail"
     success = "Success"
