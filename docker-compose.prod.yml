@@ -1,0 +1,21 @@
+# Production overrides (optimized, no volumes, more workers)
+# Usage: docker compose -f docker-compose.base.yml -f docker-compose.prod.yml up -d
+services:
+  backend:
+    build:
+      target: production
+    environment:
+      - UVICORN_RELOAD=false
+      - UVICORN_WORKERS=4
+      - UVICORN_LIMIT_CONCURRENCY=128
+    volumes: []
+    restart: unless-stopped
+
+  db:
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    ports: []
+    restart: unless-stopped
+
+volumes:
+  postgres_data_prod:

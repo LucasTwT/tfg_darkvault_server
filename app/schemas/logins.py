@@ -4,8 +4,9 @@ from datetime import datetime
 
 
 class CreateLoginRequest(BaseModel):
-    ciphertext: bytes
-    nonce: bytes
+    title: str
+    ciphertext: str
+    nonce: str
     cipher: str
     version: int
     
@@ -15,8 +16,9 @@ class CreateLoginResponse(BaseModel):
 class LoginData(BaseModel):
     id: UUID4
     vault_id: UUID4
-    ciphertext: bytes
-    nonce: bytes
+    title: str
+    ciphertext: str
+    nonce: str
     cipher: str
     version: int
     created_at: datetime

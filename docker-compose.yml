@@ -1,29 +1,5 @@
-version: "3.9"
-
-services:
-  db:
-    image: postgres:15
-    container_name: postgres_db
-    restart: always
-    env_file:
-      - .env.postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  backend:
-    build: .
-    container_name: security_app_server
-    restart: always
-    depends_on:
-      - db
-    env_file:
-      - .env.server
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
-
-volumes:
-  postgres_data:
+# Default: development mode (hot reload)
+# Usage: docker compose up
+include:
+  - docker-compose.base.yml
+  - docker-compose.dev.yml
