@@ -1,0 +1,17 @@
+# Development overrides (hot reload, volumes)
+# Usage: docker compose -f docker-compose.base.yml -f docker-compose.dev.yml up
+services:
+  backend:
+    build:
+      target: development
+    environment:
+      - UVICORN_RELOAD=true
+      - UVICORN_WORKERS=1
+    volumes:
+      - .:/app
+    env_file:
+      - .env.server
+
+  db:
+    ports:
+      - "5432:5432"
